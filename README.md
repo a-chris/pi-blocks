@@ -86,9 +86,14 @@ In the composer:
 | `⏎` | Add the highlighted block. Cursor stays put, so pressing `⏎` again adds it twice |
 | `⌫` | With an empty filter: remove the last step. Otherwise: edit the filter |
 | type | Fuzzy-filter the available list (`esc` clears it) |
-| `tab` | Switch to the step list: `↑↓` select, `ctrl+↑↓` reorder, `x` remove |
+| `tab` | Switch to the step list: `↑↓` select, `shift+↑↓` reorder, `x` remove |
 | `ctrl+r` | Run the workflow |
 | `ctrl+s` | Name it, save it, then run |
+
+Reordering keys in the step list: `shift+↑↓` is the documented one because pi's
+fullscreen viewport uses `ctrl+↑↓` to jump between prompts and swallows it before the
+composer sees it. `ctrl+↑↓` still works where the viewport does not claim it, and plain
+`K` / `J` reorder too, for terminals that send nothing useful for modified arrows.
 
 ## Blocks
 

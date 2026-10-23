@@ -129,8 +129,26 @@ export interface ComposerComponentOptions {
 
 const HINTS = {
 	available: "↑↓ move · ⏎ add · ⌫ undo · tab edit steps · ctrl+r run · ctrl+s save+run · esc cancel",
-	steps: "↑↓ select · ctrl+↑↓ reorder · x remove · tab back · ⏎ run · esc cancel",
+	steps: "↑↓ select · shift+↑↓ reorder · x remove · tab back · ⏎ run · esc cancel",
 };
+
+/**
+ * Reorder keys for the step list. `shift+↑↓` is the documented shortcut because pi's
+ * fullscreen viewport consumes `ctrl+↑↓` for prompt navigation before a non-overlay
+ * component ever sees the key. `ctrl+↑↓` stays as an alias for terminals or modes where
+ * the viewport does not claim it, and the bare letters cover terminals that do not send
+ * modified arrow keys at all.
+ */
+const REORDER_UP_KEYS = [Key.shift("up"), Key.ctrl("up")];
+const REORDER_DOWN_KEYS = [Key.shift("down"), Key.ctrl("down")];
+
+/** -1 moves the selected step up, 1 moves it down, 0 means the key is not a reorder key. */
+function reorderDirection(data: string, focus: ComposerFocus): -1 | 0 | 1 {
+	if (focus !== "steps") return 0;
+	if (data === "K" || REORDER_UP_KEYS.some((key) => matchesKey(data, key))) return -1;
+	if (data === "J" || REORDER_DOWN_KEYS.some((key) => matchesKey(data, key))) return 1;
+	return 0;
+}
 
 function printableKey(data: string): string | undefined {
 	if (data.length === 1) {
@@ -202,14 +220,12 @@ export class ComposerComponent implements Component {
 		} else if (matchesKey(data, Key.down)) {
 			if (model.focus === "steps") model.moveStepCursor(1);
 			else model.moveCursor(1);
-		} else if (matchesKey(data, Key.ctrl("up"))) {
-			model.moveStep(-1);
-		} else if (matchesKey(data, Key.ctrl("down"))) {
-			model.moveStep(1);
+		} else if (reorderDirection(data, model.focus) !== 0) {
+			model.moveStep(reorderDirection(data, model.focus));
 		} else if (matchesKey(data, Key.backspace) || matchesKey(data, Key.delete)) {
 			if (model.focus === "steps") model.removeSelected();
 			else if (!model.deleteChar()) model.removeLast();
-		} else if (data === "x" && model.focus === "steps") {
+		} else if ((data === "x" || data === "X") && model.focus === "steps") {
 			model.removeSelected();
 		} else {
 			const char = printableKey(data);

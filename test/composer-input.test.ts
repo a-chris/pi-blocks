@@ -12,6 +12,10 @@ const TAB = "\t";
 const BACKSPACE = "\x7f";
 const CTRL_R = "\x12";
 const CTRL_S = "\x13";
+const SHIFT_UP = "\x1b[1;2A";
+const SHIFT_DOWN = "\x1b[1;2B";
+const CTRL_UP = "\x1b[1;5A";
+const CTRL_DOWN = "\x1b[1;5B";
 
 const theme = {
 	fg: (_token: string, text: string) => text,
@@ -133,6 +137,39 @@ test("arrow keys in the step list move the step cursor, not the block cursor", (
 	env.press(UP);
 	assert.equal(env.model.cursor, blockCursor);
 	assert.equal(env.model.stepCursor, 0);
+});
+
+test("shift+arrows reorder the selected step, and ctrl+arrows stay an alias", () => {
+	const env = setup();
+	env.press(ENTER, DOWN, ENTER, TAB);
+	assert.equal(env.model.focus, "steps");
+	assert.equal(env.model.stepCursor, 1);
+
+	env.press(SHIFT_UP);
+	assert.deepEqual(env.model.steps, ["plan", "research"]);
+	assert.equal(env.model.stepCursor, 0);
+
+	env.press(SHIFT_DOWN);
+	assert.deepEqual(env.model.steps, ["research", "plan"]);
+
+	// The step sits at the bottom now, so the alias moves it back up first.
+	env.press(CTRL_UP);
+	assert.deepEqual(env.model.steps, ["plan", "research"]);
+
+	env.press(CTRL_DOWN);
+	assert.deepEqual(env.model.steps, ["research", "plan"]);
+});
+
+test("bare K and J reorder in the step list but still filter in the block list", () => {
+	const env = setup();
+	env.press("K", "J");
+	assert.equal(env.model.filter, "KJ");
+
+	env.press(ESC, ENTER, DOWN, ENTER, TAB);
+	env.press("K");
+	assert.deepEqual(env.model.steps, ["plan", "research"]);
+	env.press("J");
+	assert.deepEqual(env.model.steps, ["research", "plan"]);
 });
 
 test("escape with steps selected cancels without running", () => {

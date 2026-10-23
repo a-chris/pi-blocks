@@ -81,7 +81,7 @@ test("the step editor replaces the chain while it has focus", () => {
 	model.add();
 	model.cycleFocus();
 	const output = render(model, 80).join("\n");
-	assert.match(output, /ctrl\+↑↓ reorder/);
+	assert.match(output, /shift\+↑↓ reorder/);
 	assert.match(output, /1\. Research/);
 	assert.match(output, /2\. Plan/);
 });
