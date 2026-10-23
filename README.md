@@ -25,12 +25,45 @@ A block is an action in the development phase: research, plan, hunt, implement, 
 
 ## Install
 
+Install straight from GitHub — this is the intended way:
+
 ```bash
-pi install ./pi-blocks          # from a local checkout
-pi install npm:pi-blocks        # once published
-pi -e ./pi-blocks               # try it for one session
-pi -e ./pi-blocks/src/index.ts  # or load the extension file directly
+pi install git:github.com/a-chris/pi-blocks
 ```
+
+Then restart pi (or run `pi` again) and type `/wb`.
+
+Other sources:
+
+```bash
+pi install git:github.com/a-chris/pi-blocks@v0.1.0  # pin a tag or commit
+pi install https://github.com/a-chris/pi-blocks     # URL form, same git source
+pi install ./pi-blocks                             # from a local checkout
+pi install npm:pi-blocks                           # once published to npm
+```
+
+Try it for one session without changing your settings:
+
+```bash
+pi -e git:github.com/a-chris/pi-blocks
+pi -e ./pi-blocks/src/index.ts   # load just the extension file from a checkout
+```
+
+Manage it like any other package:
+
+```bash
+pi list                            # confirm it is installed
+pi update --extensions             # pull the latest commit
+pi remove git:github.com/a-chris/pi-blocks
+```
+
+Installing into a project instead of your user settings: add `--local` (writes `.pi/settings.json`, loaded once project trust is granted).
+
+### Requirements
+
+- Pi with the `@earendil-works/pi-*` 1.1 host packages (devDependencies pin `1.1.0`).
+- Nothing else at runtime — `node_modules` is dev-only, and Pi supplies the host packages.
+- A TUI session for the `/wb` composer; other subcommands work without it.
 
 ## Use
 
