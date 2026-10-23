@@ -1,0 +1,82 @@
+#!/usr/bin/expect -f
+#
+# Live TUI smoke test for /wb. Drives a real terminal, so it exercises the
+# composer, the key bindings, and one real workflow run end to end.
+#
+# It needs a model you are willing to call (a local OpenAI-compatible server is
+# ideal) and a scratch directory containing two trivial blocks plus a saved
+# workflow, because the model is only asked to print a word:
+#
+#   mkdir -p /tmp/wb-smoke/.pi/blocks /tmp/wb-smoke/.pi/workflows
+#   printf -- '---\nid: one\nname: One\n---\nSay exactly ONE, then end with a "## Handoff" section.\n' \
+#     > /tmp/wb-smoke/.pi/blocks/one.md
+#   printf -- '---\nid: two\nname: Two\n---\nSay exactly TWO.\n' \
+#     > /tmp/wb-smoke/.pi/blocks/two.md
+#   printf '{"name":"smoke","steps":["one","two"]}' > /tmp/wb-smoke/.pi/workflows/smoke.json
+#
+# Then:
+#
+#   PI_BLOCKS_CWD=/tmp/wb-smoke \
+#   PI_BLOCKS_PROVIDER=omlx --args-go-here... \
+#   expect test/manual/tui-smoke.exp
+#
+# Environment:
+#   PI_BLOCKS_CWD        scratch directory (required)
+#   PI_BLOCKS_EXT        path to the extension (default: this package's src/index.ts)
+#   PI_BLOCKS_PROVIDER   provider name passed to pi (optional)
+#   PI_BLOCKS_MODEL      model passed to pi (optional)
+#   PI_BLOCKS_PI         pi executable (default: pi on PATH)
+
+set timeout 180
+set env(TERM) xterm-256color
+set here [file normalize "[file dirname [info script]]/../.."]
+
+proc env_or {name fallback} {
+	if {[info exists ::env($name)] && $::env($name) ne ""} { return $::env($name) }
+	return $fallback
+}
+
+set cwd [env_or PI_BLOCKS_CWD ""]
+if {$cwd eq ""} {
+	send_user "PI_BLOCKS_CWD is required\n"
+	exit 1
+}
+set pi_bin [env_or PI_BLOCKS_PI "pi"]
+set ext [env_or PI_BLOCKS_EXT "$here/src/index.ts"]
+
+cd $cwd
+set argv {}
+lappend argv --no-tools -e $ext --session-dir "$cwd/.sessions"
+set provider [env_or PI_BLOCKS_PROVIDER ""]
+if {$provider ne ""} { lappend argv --provider $provider }
+set model [env_or PI_BLOCKS_MODEL ""]
+if {$model ne ""} { lappend argv --model $model }
+spawn $pi_bin {*}$argv
+
+# Wait for the editor, then compose: filter to "one", add it, filter to "two",
+# add it, and run.
+expect -re {commands}
+sleep 3
+send -- "/wb"
+sleep 1
+send -- "\r"
+expect {
+	-re {Workflow build} { send_user "\ncomposer: open\n" }
+	timeout { send_user "\nFAIL: the composer never rendered\n"; exit 2 }
+}
+sleep 1
+send -- "one"; sleep 1; send -- "\r"; sleep 1
+send -- "\u007f\u007f\u007f"; sleep 1
+send -- "two"; sleep 1; send -- "\r"; sleep 1
+send -- "\u0012"
+
+expect {
+	-re {Step 1/2} { send_user "\nstep 1: started\n" }
+	timeout { send_user "\nFAIL: step 1 never started\n"; exit 3 }
+}
+expect {
+	-re {Workflow complete: one → two} { send_user "\nPASS: both steps ran in order\n" }
+	timeout { send_user "\nFAIL: the workflow did not complete\n"; exit 4 }
+}
+send -- "\u0004"
+expect eof
