@@ -129,15 +129,16 @@ export interface ComposerComponentOptions {
 
 const HINTS = {
 	available: "↑↓ move · ⏎ add · ⌫ undo · tab edit steps · ctrl+r run · ctrl+s save+run · esc cancel",
-	steps: "↑↓ select · shift+↑↓ reorder · x remove · tab back · ⏎ run · esc cancel",
+	steps: "↑↓ select · K/J reorder · x remove · tab back · ⏎ run · esc cancel",
 };
 
 /**
- * Reorder keys for the step list. `shift+↑↓` is the documented shortcut because pi's
- * fullscreen viewport consumes `ctrl+↑↓` for prompt navigation before a non-overlay
- * component ever sees the key. `ctrl+↑↓` stays as an alias for terminals or modes where
- * the viewport does not claim it, and the bare letters cover terminals that do not send
- * modified arrow keys at all.
+ * Reorder keys for the step list.
+ *
+ * `K` and `J` are the advertised keys because they cannot be taken away: pi's fullscreen
+ * viewport claims `ctrl+↑↓` for prompt navigation before a non-overlay component sees
+ * them, and many terminals drop the shift modifier on arrows (shift+↑ arrives as a plain
+ * `↑`). `shift+↑↓` and `ctrl+↑↓` still reorder wherever they do arrive.
  */
 const REORDER_UP_KEYS = [Key.shift("up"), Key.ctrl("up")];
 const REORDER_DOWN_KEYS = [Key.shift("down"), Key.ctrl("down")];
