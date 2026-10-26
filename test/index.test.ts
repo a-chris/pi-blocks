@@ -85,11 +85,16 @@ interface CtxOptions {
 	hasUI?: boolean;
 	idle?: boolean;
 	branch?: unknown[];
+	/** What the composer resolves with. Undefined means the user escaped out of it. */
+	composed?: unknown;
+	/** Answers `ui.input` gives, in order. A missing answer resolves undefined, like esc. */
+	answers?: Array<string | undefined>;
 }
 
 function createCtx(cwd: string, options: CtxOptions = {}) {
 	const notifications: Array<{ message: string; type?: string }> = [];
 	const statuses = new Map<string, string | undefined>();
+	const prompts: string[] = [];
 	const ctx = {
 		cwd,
 		mode: options.mode ?? ("tui" as const),
@@ -99,23 +104,26 @@ function createCtx(cwd: string, options: CtxOptions = {}) {
 			theme,
 			notify: (message: string, type?: string) => notifications.push({ message, type }),
 			setStatus: (key: string, value: string | undefined) => statuses.set(key, value),
-			input: async () => undefined,
-			custom: async () => undefined,
+			input: async (title: string) => {
+				prompts.push(title);
+				return options.answers?.shift();
+			},
+			custom: async () => options.composed,
 			confirm: async () => true,
 			select: async () => undefined,
 		},
 		sessionManager: { getBranch: () => options.branch ?? [] },
 	};
-	return { ctx, notifications, statuses };
+	return { ctx, notifications, statuses, prompts };
 }
 
-function setup() {
+function setup(options: CtxOptions = {}) {
 	const cwd = mkdtempSync(join(tmpdir(), "pi-blocks-run-"));
 	const agentDir = join(cwd, "agent");
 	const fake = createFakePi();
 	piBlocks(fake.api, { agentDir });
 	saveWorkflow({ cwd, agentDir, configDirName: ".pi" }, "ship", ["research", "plan"]);
-	return { ...fake, ...createCtx(cwd), cwd };
+	return { ...fake, ...createCtx(cwd, options), cwd };
 }
 
 const HANDOFF = "did it\n\n## Handoff\n- note";
@@ -206,6 +214,34 @@ test("the model only sees the current step plus handoffs", async () => {
 	assert.match(JSON.stringify(result.messages[1]!.content), /Step 2\/2: Plan/);
 	assert.doesNotMatch(JSON.stringify(result.messages), /older conversation/);
 	assert.doesNotMatch(JSON.stringify(result.messages), /research work/);
+});
+
+test("/wb asks for the task instead of running a workflow that has none", async () => {
+	const env = setup({ composed: { steps: ["plan", "implement"] }, answers: ["make the failing auth test pass"] });
+	await env.commands.get("wb")!.handler("", env.ctx);
+
+	assert.deepEqual(env.prompts, ["What should this workflow do?"]);
+	assert.equal(env.sent.length, 1);
+	assert.match(String(env.sent[0]!.message.content), /Goal: make the failing auth test pass/);
+});
+
+test("/wb does not start when the task prompt is dismissed or left empty", async () => {
+	for (const answers of [[], ["   "]]) {
+		const env = setup({ composed: { steps: ["plan"] }, answers });
+		await env.commands.get("wb")!.handler("", env.ctx);
+
+		assert.equal(env.sent.length, 0, "no step should be sent");
+		assert.equal(env.statuses.get("pi-blocks"), undefined, "no step counter should be shown");
+		assert.match(String(env.notifications.at(-1)?.message), /not started.*task/i);
+	}
+});
+
+test("/wb <task> does not ask for one", async () => {
+	const env = setup({ composed: { steps: ["plan"] } });
+	await env.commands.get("wb")!.handler("make /wb work", env.ctx);
+
+	assert.deepEqual(env.prompts, []);
+	assert.match(String(env.sent[0]!.message.content), /Goal: make \/wb work/);
 });
 
 test("/wb run on an unknown workflow says so instead of starting", async () => {

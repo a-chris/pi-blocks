@@ -321,6 +321,14 @@ export default function piBlocks(pi: ExtensionAPI, options: PiBlocksOptions = {}
 		});
 		if (!result) return;
 
+		// Blocks say which phase to work in, never what to work on. Without a task every
+		// step would run against an empty goal, so ask for one before going any further.
+		const task = await resolveGoal(ctx, goal);
+		if (!task) {
+			ctx.ui.notify("Workflow not started: it needs a task description. Pass one with `/wb <task>`.", "warning");
+			return;
+		}
+
 		let name: string | undefined;
 		const steps = [...result.steps];
 		if (result.save) {
@@ -339,7 +347,19 @@ export default function piBlocks(pi: ExtensionAPI, options: PiBlocksOptions = {}
 			}
 		}
 
-		startRun(ctx, steps, { name, goal });
+		startRun(ctx, steps, { name, goal: task });
+	}
+
+	/**
+	 * The task handed to every step, either what came with the command or what the user
+	 * types when asked. Returns undefined when there is none: a workflow is phase
+	 * instructions only, so a run without a task asks each step to work on nothing.
+	 */
+	async function resolveGoal(ctx: ExtensionCommandContext, goal: string | undefined): Promise<string | undefined> {
+		const given = goal?.trim() ?? "";
+		if (given) return given;
+		const answer = await ctx.ui.input("What should this workflow do?", "one line: the task every step works on");
+		return answer?.trim() || undefined;
 	}
 
 	pi.registerCommand("wb", {

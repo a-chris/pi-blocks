@@ -69,8 +69,8 @@ Installing into a project instead of your user settings: add `--local` (writes `
 
 | Command | What it does |
 |---|---|
-| `/wb` | Compose a workflow and run it |
-| `/wb <goal>` | Compose, with a stated goal handed to every step |
+| `/wb` | Compose a workflow and run it; asks for the task if you did not type one |
+| `/wb <task>` | Compose with the task stated up front, handed to every step |
 | `/wb run <name>` | Run a saved workflow, optionally `/wb run <name> <goal>` |
 | `/wb edit <name>` | Load a saved workflow back into the composer |
 | `/wb save <name>` | Save the last composed or running workflow (project `.pi/workflows`) |
@@ -150,6 +150,18 @@ Between steps the context is **handoff-based**, not cumulative:
 A workflow of `research → plan → implement → test` therefore behaves like four fresh, connected sessions rather than one long conversation. When a run finishes, filtering stops and the full transcript is available again.
 
 Stop at any point with `esc`: the run is marked aborted and never advances.
+
+## The task is required
+
+Blocks only say which phase to work in — never what to work on. So a workflow needs a
+task, and `/wb` will not start without one:
+
+- `/wb <task>` uses what you typed.
+- Bare `/wb` asks **"What should this workflow do?"** after the composer closes. Dismissing
+  that prompt, or leaving it empty, cancels the run before the first step is sent.
+
+The task is repeated in every step's instructions and in the workflow contract, so it
+survives the per-step context filter — that is the only channel a task has.
 
 ## Limits worth knowing
 
