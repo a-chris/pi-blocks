@@ -4,6 +4,7 @@ name: Commit
 description: Group the working tree into short, coherent commits
 category: git
 order: 320
+from: done
 ---
 
 You are in the COMMIT phase.

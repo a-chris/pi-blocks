@@ -12,6 +12,21 @@ export const RUN_ENTRY_TYPE = "pi-blocks-run";
 
 const MAX_HANDOFF_CHARS = 700;
 
+/**
+ * The outcome line, spelled out for every step.
+ *
+ * It is what the gate reads: the workflow refuses to hand a step's work to a step that
+ * cannot use it, so the model has to say plainly whether it produced anything.
+ */
+export const OUTCOME_RULE = [
+	`Then report how the step ended, on its own final line:`,
+	`Outcome: done       — you did the work and it produced its result (a change, a plan, a diagnosis, a verdict, passing checks)`,
+	`Outcome: nothing    — you did the work and there was nothing to do or nothing to find`,
+	`Outcome: failed     — the work is done and the result is negative: checks fail, or the change is not ready to ship`,
+	`Outcome: blocked    — you could not do the work at all (missing access, missing decision, broken environment)`,
+	`The workflow stops when your outcome leaves the next step nothing to work on, so report the true one.`,
+].join("\n");
+
 /** Matches a line that labels the handoff section, capturing any text on that line. */
 const HANDOFF_LABEL = /^[ \t]*(?:#{1,6}[ \t]*)?(?:[-*+][ \t]*)?(?:\*\*|__)?handoff(?:\*\*|__)?[ \t]*:?[ \t]*(.*)$/i;
 
@@ -36,6 +51,8 @@ export function buildStepPrompt(run: WorkflowRun): string {
 		"---",
 		`Requests that belong to the other steps are handled later; do not do them now. Do the work for this step, then stop.`,
 		`End your final message with a "${HANDOFF_HEADING}" section: up to 5 short bullets covering what you decided, what you changed (paths), what you verified, and what the next step must know. The rest of the conversation is not carried forward — this section is.`,
+		"",
+		OUTCOME_RULE,
 	);
 	return lines.join("\n");
 }
@@ -60,14 +77,16 @@ export function buildContract(run: WorkflowRun): string {
 		run.handoffs.forEach((handoff, index) => {
 			if (!handoff) return;
 			const completed = run.steps[index];
-			lines.push(`- Step ${index + 1} (${completed?.blockId ?? "?"}): ${truncate(handoff, MAX_HANDOFF_CHARS)}`);
+			const outcome = run.outcomes?.[index];
+			const label = `Step ${index + 1} (${completed?.blockId ?? "?"}${outcome ? `, ${outcome}` : ""})`;
+			lines.push(`- ${label}: ${truncate(handoff, MAX_HANDOFF_CHARS)}`);
 		});
 	}
 
 	lines.push(
 		"",
 		`Rules for this step: do only the work of step ${run.index + 1}. Do not start later steps.`,
-		`Finish with a "${HANDOFF_HEADING}" section — it is the only part of your work the next step will see.`,
+		`Finish with a "${HANDOFF_HEADING}" section — it is the only part of your work the next step will see — then an \`Outcome:\` line (done, nothing, failed, blocked) saying whether this step produced anything.`,
 	);
 	return lines.join("\n");
 }

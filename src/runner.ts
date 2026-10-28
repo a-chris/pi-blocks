@@ -1,4 +1,5 @@
 import { BLOCK_MESSAGE_TYPE, buildStepPrompt, extractHandoff } from "./handoff.ts";
+import { allowsOutcome, describeFrom, parseOutcome } from "./outcome.ts";
 import type { Step, WorkflowRun } from "./types.ts";
 
 /** Structurally compatible with the boundary draft the event expects. */
@@ -19,6 +20,7 @@ export type SettleOutcome =
 	| { kind: "idle" }
 	| { kind: "advanced"; run: WorkflowRun; entries: StepEntryDraft[]; continue: true }
 	| { kind: "finished"; run: WorkflowRun }
+	| { kind: "stopped"; run: WorkflowRun }
 	| { kind: "aborted"; run: WorkflowRun };
 
 export interface StartOptions {
@@ -53,6 +55,7 @@ export class WorkflowRunner {
 			steps: steps.map((step) => ({ ...step })),
 			index: 0,
 			handoffs: [],
+			outcomes: [],
 			status: "running",
 			startedAt: options.startedAt ?? new Date().toISOString(),
 		};
@@ -63,7 +66,15 @@ export class WorkflowRunner {
 
 	/** Rebuild a run from persisted state, for example after a session resume. */
 	restore(run: WorkflowRun | undefined): void {
-		this.current = run ? { ...run, steps: run.steps.map((step) => ({ ...step })), handoffs: [...run.handoffs] } : undefined;
+		this.current = run
+			? {
+					...run,
+					steps: run.steps.map((step) => ({ ...step })),
+					handoffs: [...run.handoffs],
+					// Runs persisted before outcomes existed are still readable.
+					outcomes: [...(run.outcomes ?? [])],
+				}
+			: undefined;
 		// A restored run has already settled every step below its index.
 		this.settledIndex = run && run.status === "running" ? run.index - 1 : -1;
 	}
@@ -116,11 +127,25 @@ export class WorkflowRunner {
 		if (!lastAssistantText || !lastAssistantText.trim()) return { kind: "idle" };
 
 		run.handoffs[run.index] = extractHandoff(lastAssistantText) ?? "";
+		// A step that never says how it ended is assumed to have done its job: stopping a
+		// whole workflow over a missing line would punish the formatting, not the work.
+		const reported = parseOutcome(lastAssistantText) ?? "done";
+		run.outcomes[run.index] = reported;
 		this.settledIndex = run.index;
 
 		if (run.index + 1 >= run.steps.length) {
 			run.status = "done";
 			return { kind: "finished", run };
+		}
+
+		// The gate: the next step declares what it can start from, this step says what it
+		// actually produced. Nothing to hand over means nothing to run.
+		const next = run.steps[run.index + 1];
+		if (!allowsOutcome(next, reported)) {
+			const previous = run.steps[run.index]!;
+			run.status = "stopped";
+			run.stopReason = `${previous.blockId} reported ${reported}; ${next?.blockId ?? "the next step"} only runs after ${describeFrom(next)}`;
+			return { kind: "stopped", run };
 		}
 
 		run.index += 1;

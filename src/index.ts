@@ -21,6 +21,7 @@ import {
 	buildStepPrompt,
 	renderChain,
 } from "./handoff.ts";
+import { stopSummary } from "./outcome.ts";
 import type { StepEntryDraft } from "./runner.ts";
 import { WorkflowRunner } from "./runner.ts";
 import type { Block, ComposerResult, WorkflowRun } from "./types.ts";
@@ -230,6 +231,14 @@ export default function piBlocks(pi: ExtensionAPI, options: PiBlocksOptions = {}
 				updateStatus(ctx);
 				ctx.ui.notify(`Workflow complete: ${renderChain(result.run)}`, "info");
 				return;
+			case "stopped":
+				persist();
+				updateStatus(ctx);
+				ctx.ui.notify(
+					`Workflow stopped at step ${result.run.index + 1}/${result.run.steps.length}: ${result.run.stopReason ?? "the step produced nothing to hand on"}`,
+					"warning",
+				);
+				return;
 			case "aborted":
 				persist();
 				updateStatus(ctx);
@@ -265,7 +274,8 @@ export default function piBlocks(pi: ExtensionAPI, options: PiBlocksOptions = {}
 		const run = entry.data?.run;
 		// Only the end of a run is worth a transcript line; the intermediate snapshots are bookkeeping.
 		if (!run || run.status === "running") return undefined;
-		return new Text(theme.fg("muted", `⛓ ${renderChain(run)} · ${run.status}`), 0, 0);
+		const suffix = run.status === "stopped" ? `: ${stopSummary(run)}` : "";
+		return new Text(theme.fg("muted", `⛓ ${renderChain(run)} · ${run.status}${suffix}`), 0, 0);
 	});
 
 	// --- command -------------------------------------------------------------
@@ -415,7 +425,7 @@ export default function piBlocks(pi: ExtensionAPI, options: PiBlocksOptions = {}
 				mkdirSync(dir, { recursive: true });
 				writeFileSync(
 					path,
-					`---\nid: ${id}\nname: ${id}\ndescription: One line shown in the composer\ncategory: custom\n---\n\nDescribe the work for this step.\n\nEnd with a "## Handoff" section.\n`,
+					`---\nid: ${id}\nname: ${id}\ndescription: One line shown in the composer\ncategory: custom\n# from: done, failed   # outcomes of the previous step this one can start from\n---\n\nDescribe the work for this step.\n\nEnd with a "## Handoff" section, then an \`Outcome:\` line.\n`,
 					"utf-8",
 				);
 				ctx.ui.notify(`Created ${path}`, "info");

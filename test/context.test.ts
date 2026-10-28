@@ -33,6 +33,7 @@ function makeRun(overrides: Partial<WorkflowRun> = {}): WorkflowRun {
 			{ blockId: "plan", name: "Plan", instructions: "plan" },
 		],
 		index: 1,
+		outcomes: [],
 		handoffs: ["found the parser"],
 		status: "running",
 		startedAt: new Date(0).toISOString(),

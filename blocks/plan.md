@@ -4,6 +4,7 @@ name: Plan
 description: Turn the request into ordered, verifiable steps
 category: think
 order: 20
+from: done, failed
 ---
 
 You are in the PLANNING phase. Make no changes to any file.

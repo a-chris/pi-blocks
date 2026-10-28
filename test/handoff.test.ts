@@ -19,6 +19,7 @@ function makeRun(overrides: Partial<WorkflowRun> = {}): WorkflowRun {
 			{ blockId: "test", name: "Test", instructions: "Run the checks." },
 		],
 		index: 1,
+		outcomes: [],
 		handoffs: ["found the parser"],
 		status: "running",
 		startedAt: new Date(0).toISOString(),
@@ -90,4 +91,18 @@ test("no text means no handoff", () => {
 
 test("the chain reads in order", () => {
 	assert.equal(renderChain(makeRun()), "research → plan → test");
+});
+
+test("every step prompt demands an outcome line", () => {
+	const prompt = buildStepPrompt(makeRun());
+	assert.match(prompt, /Outcome: done/);
+	assert.match(prompt, /Outcome: nothing/);
+	assert.match(prompt, /Outcome: failed/);
+	assert.match(prompt, /Outcome: blocked/);
+});
+
+test("the contract carries each completed step's outcome", () => {
+	const contract = buildContract(makeRun({ outcomes: ["nothing"] }));
+	assert.match(contract, /Step 1 \(research, nothing\)/);
+	assert.match(contract, /Outcome:/);
 });

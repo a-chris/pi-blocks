@@ -140,3 +140,28 @@ test("a project block overrides a bundled block with the same id", () => {
 	assert.ok(blocks.some((block) => block.id === "research" && block.source === "bundled"));
 	assert.equal(blocks.filter((block) => block.id === "plan").length, 1);
 });
+
+test("from: declares which previous outcomes a block can start from", () => {
+	const block = parseBlock("---\nid: test\nfrom: done, failed\n---\n\nRun the checks.\n", opts);
+	assert.deepEqual(block?.from, ["done", "failed"]);
+
+	const spaced = parseBlock("---\nid: debug\nfrom: done failed  nothing\n---\n\nFix it.\n", opts);
+	assert.deepEqual(spaced?.from, ["done", "failed", "nothing"]);
+});
+
+test("a block with no from: accepts only a completed step", () => {
+	const block = parseBlock("---\nid: pr\n---\n\nShip it.\n", opts);
+	assert.equal(block?.from, undefined);
+});
+
+test("unknown from: words are dropped instead of making the block unloadable", () => {
+	const block = parseBlock("---\nid: odd\nfrom: done, whenever\n---\n\nDo it.\n", opts);
+	assert.deepEqual(block?.from, ["done"]);
+	assert.equal(parseBlock("---\nid: odd\nfrom: whenever\n---\n\nDo it.\n", opts)?.from, undefined);
+});
+
+test("resolveSteps snapshots the gate declaration onto the step", () => {
+	const block = parseBlock("---\nid: test\nfrom: done, failed\n---\n\nRun the checks.\n", opts)!;
+	const { steps } = resolveSteps(["test"], [block]);
+	assert.deepEqual(steps[0]?.from, ["done", "failed"]);
+});

@@ -4,6 +4,7 @@ name: PR
 description: Open a pull request that explains itself
 category: git
 order: 330
+from: done
 ---
 
 You are in the PULL REQUEST phase.

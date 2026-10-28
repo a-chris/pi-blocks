@@ -1,3 +1,6 @@
+/** How a step ended, reported by the step itself at the end of its handoff. */
+export type StepOutcome = "done" | "nothing" | "failed" | "blocked";
+
 /** Where a block definition was loaded from. Later sources win on `id` collisions. */
 export type BlockSource = "bundled" | "global" | "project";
 
@@ -18,6 +21,11 @@ export interface Block {
 	source: BlockSource;
 	/** Absolute path of the file, or `<bundled>` for built-in blocks. */
 	path: string;
+	/**
+	 * Outcomes of the previous step this block can start from. Declared as `from:` in
+	 * frontmatter; absent means `done`, so a step that produced nothing stops the run.
+	 */
+	from?: StepOutcome[];
 }
 
 /** A block resolved into a concrete workflow step. Snapshotted so edits mid-run cannot change history. */
@@ -25,6 +33,8 @@ export interface Step {
 	blockId: string;
 	name: string;
 	instructions: string;
+	/** Gate declaration snapshotted from the block, so a mid-run edit cannot change the flow. */
+	from?: StepOutcome[];
 }
 
 /** A saved, reusable workflow. Stored as JSON. */
@@ -36,7 +46,8 @@ export interface WorkflowDef {
 	updatedAt: string;
 }
 
-export type RunStatus = "running" | "done" | "aborted";
+/** `stopped` means a step ran out of work and the workflow refused to carry on. */
+export type RunStatus = "running" | "done" | "stopped" | "aborted";
 
 /**
  * A live workflow run.
@@ -55,7 +66,11 @@ export interface WorkflowRun {
 	index: number;
 	/** Handoff text produced by each completed step, parallel to `steps`. */
 	handoffs: string[];
+	/** Outcome each completed step reported, parallel to `steps`. */
+	outcomes: StepOutcome[];
 	status: RunStatus;
+	/** One line explaining why the run stopped early, when it did. */
+	stopReason?: string;
 	startedAt: string;
 }
 
