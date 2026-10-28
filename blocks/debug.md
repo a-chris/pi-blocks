@@ -4,7 +4,6 @@ name: Debug
 description: Reproduce, then fix the root cause
 category: build
 order: 120
-from: done, failed
 ---
 
 You are in the DEBUG phase.

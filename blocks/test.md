@@ -4,7 +4,6 @@ name: Test
 description: Run the decisive checks once and report honestly
 category: verify
 order: 210
-from: done, failed
 ---
 
 You are in the TEST phase. Prefer running code over reasoning about it.
@@ -14,4 +13,4 @@ You are in the TEST phase. Prefer running code over reasoning about it.
 - Report failures verbatim, with the command that produced them. Never claim a result you did not observe.
 - If a check is too slow to run, say so instead of implying it ran.
 
-Exit when you have run the decisive checks and can state plainly what passed, what failed, and what was not run. Report `Outcome: failed` when a check fails, `Outcome: done` when they pass.
+Exit when you have run the decisive checks and can state plainly what passed, what failed, and what was not run. Report `Outcome: failed` when a check fails, `Outcome: done` when they pass. If there is no diff or no new behaviour to check, report `Outcome: skipped — nothing to test`.

@@ -195,27 +195,25 @@ test("an aborted run stops instead of advancing", async () => {
 	assert.ok(env.notifications.some((entry) => /stopped at step 1/.test(entry.message)));
 });
 
-test("a step that produced nothing stops the run instead of handing over", async () => {
+test("a step that decides it has no work stops the run instead of handing over", async () => {
 	const env = setup();
 	await env.commands.get("wb")!.handler("run ship", env.ctx);
-	await env.api.emit(
-		"agent_end",
-		{ type: "agent_end", messages: [assistantMessage("nothing to gather\n\n## Handoff\n- looked\n\nOutcome: nothing")] },
-		env.ctx,
-	);
+	// Step 2 could skip for any reason; the command must not issue it a follow-up turn.
+	const skipped = "nothing to plan\n\n## Handoff\n- no facts\n\nOutcome: skipped — research handed over no facts";
+	await env.api.emit("agent_end", { type: "agent_end", messages: [assistantMessage(skipped)] }, env.ctx);
 
 	const boundary = await env.api.emit("agent_before_settle", { type: "agent_before_settle", outcome: "completed" }, env.ctx);
 	assert.equal(boundary, undefined, "no next step may be issued");
 
 	const notice = env.notifications.at(-1)?.message ?? "";
 	assert.match(notice, /Workflow stopped at step 1\/2/);
-	assert.match(notice, /research reported nothing; plan only runs after done or failed/);
+	assert.match(notice, /research skipped: research handed over no facts/);
 	assert.equal(env.statuses.get("pi-blocks"), undefined, "the step counter clears");
 
 	const persisted = env.entries.at(-1) as { customType: string; data: { run: { status: string; stopReason?: string } } };
 	assert.equal(persisted.customType, "pi-blocks-run");
 	assert.equal(persisted.data.run.status, "stopped");
-	assert.match(persisted.data.run.stopReason ?? "", /reported nothing/);
+	assert.match(persisted.data.run.stopReason ?? "", /skipped/);
 
 	// A stopped run is no longer filtered: the transcript comes back whole.
 	const messages = [userMessage("older conversation"), assistantMessage("work")];
@@ -223,18 +221,16 @@ test("a step that produced nothing stops the run instead of handing over", async
 	assert.equal(result, undefined);
 });
 
-test("a step that changed nothing stops before a step that needs a change", async () => {
+test("a step that reports what it produced still runs the rest of the chain", async () => {
 	const env = setup();
-	saveWorkflow({ cwd: env.cwd, agentDir: join(env.cwd, "agent"), configDirName: ".pi" }, "build", ["implement", "test"]);
-	await env.commands.get("wb")!.handler("run build", env.ctx);
+	await env.commands.get("wb")!.handler("run ship", env.ctx);
 	await env.api.emit(
 		"agent_end",
-		{ type: "agent_end", messages: [assistantMessage("nothing needed changing\n\nOutcome: nothing")] },
+		{ type: "agent_end", messages: [assistantMessage("looked\n\n## Handoff\n- facts\n\nOutcome: nothing")] },
 		env.ctx,
 	);
 	const boundary = await env.api.emit("agent_before_settle", { type: "agent_before_settle", outcome: "completed" }, env.ctx);
-	assert.equal(boundary, undefined);
-	assert.match(env.notifications.at(-1)?.message ?? "", /implement reported nothing; test only runs after done or failed/);
+	assert.notEqual(boundary, undefined, "a fact is not a decision to stop");
 });
 
 test("the model only sees the current step plus handoffs", async () => {

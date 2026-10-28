@@ -4,7 +4,6 @@ name: Hunt
 description: Locate the root cause of a bug without fixing it
 category: think
 order: 30
-from: done, failed
 ---
 
 You are in the HUNT phase. Find the cause; do not fix it, and do not change files.
@@ -16,4 +15,4 @@ Work from the symptom backwards:
 - Prove the cause rather than guessing it: an experiment, a log, a failing assertion, a bisect.
 - Rule out nearby suspects explicitly, so the next step does not re-check them.
 
-Exit when you can point at the mechanism that produces the symptom, cite the file and line, and explain why it fires only in those conditions. If the cause cannot be reproduced or located, say so and report `Outcome: nothing`.
+Exit when you can point at the mechanism that produces the symptom, cite the file and line, and explain why it fires only in those conditions. If the cause cannot be reproduced or located, say so and report `Outcome: nothing` — a hunt that comes back empty is a result, not a failure.

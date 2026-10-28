@@ -93,12 +93,25 @@ test("the chain reads in order", () => {
 	assert.equal(renderChain(makeRun()), "research → plan → test");
 });
 
-test("every step prompt demands an outcome line", () => {
+test("every step prompt demands an outcome line and offers the skip decision", () => {
 	const prompt = buildStepPrompt(makeRun());
 	assert.match(prompt, /Outcome: done/);
 	assert.match(prompt, /Outcome: nothing/);
 	assert.match(prompt, /Outcome: failed/);
 	assert.match(prompt, /Outcome: blocked/);
+	assert.match(prompt, /Outcome: skipped/);
+	assert.match(prompt, /only `skipped` ends the run/i);
+});
+
+test("the skip decision is offered only when there are handoffs to judge", () => {
+	assert.match(buildStepPrompt(makeRun()), /Before you start, check the handoffs above/);
+	assert.doesNotMatch(buildStepPrompt(makeRun({ index: 0, handoffs: [] })), /Before you start, check the handoffs/);
+});
+
+test("the skip rule is spelled out where the decision is made, with the bias against skipping", () => {
+	const prompt = buildStepPrompt(makeRun());
+	assert.match(prompt, /do not invent work/);
+	assert.match(prompt, /when in doubt, do the work/i);
 });
 
 test("the contract carries each completed step's outcome", () => {

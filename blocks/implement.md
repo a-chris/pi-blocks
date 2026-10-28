@@ -4,7 +4,6 @@ name: Implement
 description: Make the change with a minimal, focused diff
 category: build
 order: 110
-from: done, failed
 ---
 
 You are in the IMPLEMENTATION phase.
@@ -16,4 +15,4 @@ Make the change, and only the change:
 - Follow the conventions already present in the code you are touching.
 - When something blocks you, stop and report it instead of routing around it.
 
-Exit when the change is complete and consistent with its surroundings, and you can list every file you touched and why. If there was nothing to change, report `Outcome: nothing` instead of inventing work.
+Exit when the change is complete and consistent with its surroundings, and you can list every file you touched and why. If there was nothing to change, report `Outcome: skipped — nothing to change` instead of inventing work.

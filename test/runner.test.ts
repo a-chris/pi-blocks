@@ -146,71 +146,52 @@ test("restoring undefined leaves the runner empty", () => {
 	assert.equal(runner.run, undefined);
 });
 
-// --- stopping when a step produced nothing ---------------------------------
+// --- the step itself decides whether it has work --------------------------
 
 const REPORTING = (outcome: string) => `${HANDOFF}\n\nOutcome: ${outcome}`;
 
-const gated: Step[] = [
-	{ blockId: "implement", name: "Implement", instructions: "change", from: ["done", "failed"] },
-	{ blockId: "test", name: "Test", instructions: "check", from: ["done", "failed"] },
-	{ blockId: "pr", name: "PR", instructions: "ship", from: ["done"] },
-];
-
-test("a step that changed nothing stops the workflow instead of running the next one", () => {
+test("a step that finds nothing to act on stops the run and never advances", () => {
 	const runner = new WorkflowRunner();
-	runner.start(gated);
+	runner.start(steps);
 
-	const result = runner.settle("completed", REPORTING("nothing"));
+	const result = runner.settle("completed", REPORTING("skipped — nothing changed, so there is no diff to test"));
 	assert.equal(result.kind, "stopped");
 	assert.equal(runner.run?.status, "stopped");
 	assert.equal(runner.run?.index, 0);
-	assert.equal(runner.run?.outcomes[0], "nothing");
-	assert.match(runner.run?.stopReason ?? "", /implement reported nothing; test only runs after done or failed/);
+	assert.equal(runner.run?.outcomes[0], "skipped");
+	assert.equal(runner.run?.stopReason, "research skipped: nothing changed, so there is no diff to test");
 	// A stopped run never advances again.
 	assert.equal(runner.settle("completed", REPORTING("done")).kind, "idle");
 	assert.equal(runner.run?.index, 0);
 });
 
-test("the same outcome continues or stops depending on what the next step accepts", () => {
-	// A failing test still feeds debug, but not a PR.
+test("a skip on the last step is still a stop, not a finished run", () => {
 	const runner = new WorkflowRunner();
-	runner.start([
-		{ blockId: "test", name: "Test", instructions: "check" },
-		{ blockId: "debug", name: "Debug", instructions: "fix", from: ["done", "failed"] },
-	]);
-	const advanced = runner.settle("completed", REPORTING("failed"));
-	assert.equal(advanced.kind, "advanced");
-	assert.equal(runner.run?.index, 1);
-
-	const shipping = new WorkflowRunner();
-	shipping.start([
-		{ blockId: "implement", name: "Implement", instructions: "change" },
-		{ blockId: "test", name: "Test", instructions: "check" },
-		{ blockId: "pr", name: "PR", instructions: "ship", from: ["done"] },
-	]);
-	assert.equal(shipping.settle("completed", REPORTING("done")).kind, "advanced");
-	const stopped = shipping.settle("completed", REPORTING("failed"));
-	assert.equal(stopped.kind, "stopped");
-	assert.match(shipping.run?.stopReason ?? "", /test reported failed; pr only runs after done/);
-});
-
-test("a blocked step stops the workflow even where a failure would have continued", () => {
-	const runner = new WorkflowRunner();
-	runner.start(gated);
-	assert.equal(runner.settle("completed", REPORTING("blocked")).kind, "stopped");
+	runner.start([steps[2]!]);
+	assert.equal(runner.settle("completed", REPORTING("skipped — nothing to test")).kind, "stopped");
 	assert.equal(runner.run?.status, "stopped");
 });
 
-test("the last step finishes regardless of what it reports", () => {
+test("facts do not stop the run: only the skip decision does", () => {
+	for (const outcome of ["nothing", "failed", "blocked", "done"]) {
+		const runner = new WorkflowRunner();
+		runner.start(steps);
+		const result = runner.settle("completed", REPORTING(outcome));
+		assert.equal(result.kind, "advanced", `${outcome} must be handed to the next step`);
+		assert.equal(runner.run?.outcomes[0], outcome);
+	}
+});
+
+test("a skip with no reason of its own borrows the first handoff line", () => {
 	const runner = new WorkflowRunner();
-	runner.start([{ blockId: "test", name: "Test", instructions: "check" }]);
-	assert.equal(runner.settle("completed", REPORTING("failed")).kind, "finished");
-	assert.equal(runner.run?.status, "done");
+	runner.start(steps);
+	runner.settle("completed", "did nothing useful\n\n## Handoff\n- no diff exists to test\n- stopped\n\nOutcome: skipped");
+	assert.equal(runner.run?.stopReason, "research skipped: no diff exists to test");
 });
 
 test("a step that forgets the outcome line is treated as done rather than killing the run", () => {
 	const runner = new WorkflowRunner();
-	runner.start(gated);
+	runner.start(steps);
 	const result = runner.settle("completed", HANDOFF);
 	assert.equal(result.kind, "advanced");
 	assert.equal(runner.run?.outcomes[0], "done");
@@ -218,13 +199,13 @@ test("a step that forgets the outcome line is treated as done rather than killin
 
 test("a restored stopped run stays stopped and keeps its reason", () => {
 	const runner = new WorkflowRunner();
-	runner.start(gated);
-	runner.settle("completed", REPORTING("nothing"));
+	runner.start(steps);
+	runner.settle("completed", REPORTING("skipped — nothing to review"));
 	const snapshot = JSON.parse(JSON.stringify(runner.run));
 
 	const revived = new WorkflowRunner();
 	revived.restore(snapshot);
 	assert.equal(revived.run?.status, "stopped");
-	assert.match(revived.run?.stopReason ?? "", /reported nothing/);
+	assert.match(revived.run?.stopReason ?? "", /nothing to review/);
 	assert.equal(revived.settle("completed", REPORTING("done")).kind, "idle");
 });

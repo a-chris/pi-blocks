@@ -1,5 +1,10 @@
-/** How a step ended, reported by the step itself at the end of its handoff. */
-export type StepOutcome = "done" | "nothing" | "failed" | "blocked";
+/**
+ * How a step ended, reported by the step itself at the end of its handoff.
+ *
+ * `skipped` is the decision that this phase had nothing to work on, and the only outcome
+ * that stops the run. The rest are facts the next step reads before deciding for itself.
+ */
+export type StepOutcome = "done" | "nothing" | "failed" | "blocked" | "skipped";
 
 /** Where a block definition was loaded from. Later sources win on `id` collisions. */
 export type BlockSource = "bundled" | "global" | "project";
@@ -21,11 +26,6 @@ export interface Block {
 	source: BlockSource;
 	/** Absolute path of the file, or `<bundled>` for built-in blocks. */
 	path: string;
-	/**
-	 * Outcomes of the previous step this block can start from. Declared as `from:` in
-	 * frontmatter; absent means `done`, so a step that produced nothing stops the run.
-	 */
-	from?: StepOutcome[];
 }
 
 /** A block resolved into a concrete workflow step. Snapshotted so edits mid-run cannot change history. */
@@ -33,8 +33,6 @@ export interface Step {
 	blockId: string;
 	name: string;
 	instructions: string;
-	/** Gate declaration snapshotted from the block, so a mid-run edit cannot change the flow. */
-	from?: StepOutcome[];
 }
 
 /** A saved, reusable workflow. Stored as JSON. */

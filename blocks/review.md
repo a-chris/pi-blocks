@@ -4,7 +4,6 @@ name: Review
 description: Critique the change as an unfriendly reviewer
 category: verify
 order: 220
-from: done, failed
 ---
 
 You are in the REVIEW phase. Report findings; do not change code unless the finding is trivial and unambiguous.
@@ -18,4 +17,4 @@ Read the change as someone who will be paged when it breaks:
 
 If a review skill or prompt template is available in this session, follow it and say so.
 
-Exit when the findings are ranked and each one names a concrete consequence. If the change is sound, say that plainly instead of inventing findings. Report `Outcome: failed` when a must-fix finding stands, `Outcome: done` otherwise.
+Exit when the findings are ranked and each one names a concrete consequence. If the change is sound, say that plainly instead of inventing findings. Report `Outcome: failed` when a must-fix finding stands, `Outcome: done` otherwise. If there is no change to read, report `Outcome: skipped — nothing to review`.

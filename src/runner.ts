@@ -1,5 +1,5 @@
 import { BLOCK_MESSAGE_TYPE, buildStepPrompt, extractHandoff } from "./handoff.ts";
-import { allowsOutcome, describeFrom, parseOutcome } from "./outcome.ts";
+import { parseOutcomeReport } from "./outcome.ts";
 import type { Step, WorkflowRun } from "./types.ts";
 
 /** Structurally compatible with the boundary draft the event expects. */
@@ -126,29 +126,41 @@ export class WorkflowRunner {
 		// No model output for this step means nothing ran; wait for a real one.
 		if (!lastAssistantText || !lastAssistantText.trim()) return { kind: "idle" };
 
-		run.handoffs[run.index] = extractHandoff(lastAssistantText) ?? "";
+		const handoff = extractHandoff(lastAssistantText) ?? "";
+		run.handoffs[run.index] = handoff;
 		// A step that never says how it ended is assumed to have done its job: stopping a
 		// whole workflow over a missing line would punish the formatting, not the work.
-		const reported = parseOutcome(lastAssistantText) ?? "done";
-		run.outcomes[run.index] = reported;
+		const report = parseOutcomeReport(lastAssistantText) ?? { outcome: "done" as const };
+		run.outcomes[run.index] = report.outcome;
 		this.settledIndex = run.index;
+
+		// The decision is made by the step, at the moment it starts, from its own
+		// instructions and the handoffs — so a block the user invents tomorrow needs no
+		// declaration anywhere for the gate to understand it.
+		if (report.outcome === "skipped") {
+			const step = run.steps[run.index]!;
+			const reason = report.reason ?? firstLine(handoff) ?? "nothing to work on";
+			run.status = "stopped";
+			run.stopReason = `${step.blockId} skipped: ${reason}`;
+			return { kind: "stopped", run };
+		}
 
 		if (run.index + 1 >= run.steps.length) {
 			run.status = "done";
 			return { kind: "finished", run };
 		}
 
-		// The gate: the next step declares what it can start from, this step says what it
-		// actually produced. Nothing to hand over means nothing to run.
-		const next = run.steps[run.index + 1];
-		if (!allowsOutcome(next, reported)) {
-			const previous = run.steps[run.index]!;
-			run.status = "stopped";
-			run.stopReason = `${previous.blockId} reported ${reported}; ${next?.blockId ?? "the next step"} only runs after ${describeFrom(next)}`;
-			return { kind: "stopped", run };
-		}
-
 		run.index += 1;
 		return { kind: "advanced", run, entries: [this.stepEntry()], continue: true };
 	}
+}
+
+/** First meaningful line of a handoff, for a stop message that has no reason of its own. */
+function firstLine(handoff: string): string | undefined {
+	const line = handoff
+		.split("\n")
+		.map((entry) => entry.replace(/^[\s*_>-]+/, "").trim())
+		.find((entry) => entry.length > 0);
+	if (!line) return undefined;
+	return line.length > 140 ? `${line.slice(0, 139)}…` : line;
 }

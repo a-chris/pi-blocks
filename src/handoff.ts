@@ -15,16 +15,32 @@ const MAX_HANDOFF_CHARS = 700;
 /**
  * The outcome line, spelled out for every step.
  *
- * It is what the gate reads: the workflow refuses to hand a step's work to a step that
- * cannot use it, so the model has to say plainly whether it produced anything.
+ * The step reports what it produced, the next step reads that report before deciding for
+ * itself whether it has work — so the wording has to be plain about "there was nothing
+ * here" without making that the easy answer.
  */
 export const OUTCOME_RULE = [
 	`Then report how the step ended, on its own final line:`,
 	`Outcome: done       — you did the work and it produced its result (a change, a plan, a diagnosis, a verdict, passing checks)`,
-	`Outcome: nothing    — you did the work and there was nothing to do or nothing to find`,
+	`Outcome: nothing    — the work was done and what you were looking for was not there`,
 	`Outcome: failed     — the work is done and the result is negative: checks fail, or the change is not ready to ship`,
 	`Outcome: blocked    — you could not do the work at all (missing access, missing decision, broken environment)`,
-	`The workflow stops when your outcome leaves the next step nothing to work on, so report the true one.`,
+	`Outcome: skipped    — this phase had nothing to act on, so you did not do it; add the reason after a dash`,
+	``,
+	`Only \`skipped\` ends the run. Every other outcome is a fact for whoever comes next.`,
+].join("\n");
+
+/**
+ * The skip decision, offered only once there is something to judge.
+ *
+ * A step that would otherwise invent work — re-running a review on an unchanged diff,
+ * testing a change nobody made — stops the run instead, and it is the step itself that
+ * decides, because only it knows what its instructions need.
+ */
+export const SKIP_RULE = [
+	`Before you start, check the handoffs above: is there work here for this phase?`,
+	`If the earlier steps left nothing to act on — nothing changed, nothing found, no cause located, no facts to work from — do not invent work and do not repeat an earlier phase. Answer with a short "Handoff" section and end with \`Outcome: skipped — <what was missing>\`; the run stops there.`,
+	`A thin or incomplete handoff is not a reason to skip: when in doubt, do the work.`,
 ].join("\n");
 
 /** Matches a line that labels the handoff section, capturing any text on that line. */
@@ -51,6 +67,7 @@ export function buildStepPrompt(run: WorkflowRun): string {
 		"---",
 		`Requests that belong to the other steps are handled later; do not do them now. Do the work for this step, then stop.`,
 		`End your final message with a "${HANDOFF_HEADING}" section: up to 5 short bullets covering what you decided, what you changed (paths), what you verified, and what the next step must know. The rest of the conversation is not carried forward — this section is.`,
+		...(run.handoffs.some(Boolean) ? ["", SKIP_RULE] : []),
 		"",
 		OUTCOME_RULE,
 	);
@@ -86,7 +103,7 @@ export function buildContract(run: WorkflowRun): string {
 	lines.push(
 		"",
 		`Rules for this step: do only the work of step ${run.index + 1}. Do not start later steps.`,
-		`Finish with a "${HANDOFF_HEADING}" section — it is the only part of your work the next step will see — then an \`Outcome:\` line (done, nothing, failed, blocked) saying whether this step produced anything.`,
+		`Finish with a "${HANDOFF_HEADING}" section — it is the only part of your work the next step will see — then an \`Outcome:\` line (done, nothing, failed, blocked, skipped) reporting what you produced.`,
 	);
 	return lines.join("\n");
 }

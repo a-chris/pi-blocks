@@ -2,8 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "./frontmatter.ts";
-import { normalizeOutcome } from "./outcome.ts";
-import type { Block, BlockSource, Step, StepOutcome } from "./types.ts";
+import type { Block, BlockSource, Step } from "./types.ts";
 
 /** Bundled defaults live next to the extension entry point, in the package's `blocks/` directory. */
 export const BUNDLED_BLOCKS_DIR = fileURLToPath(new URL("../blocks", import.meta.url));
@@ -30,22 +29,6 @@ function titleCase(id: string): string {
 
 function asString(value: unknown): string | undefined {
 	return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-/**
- * `from: done, failed` -> ["done", "failed"].
- *
- * Unknown words are dropped rather than fatal: a typo then falls back to the default
- * gate instead of making the block unloadable.
- */
-function asOutcomeList(value: unknown): StepOutcome[] | undefined {
-	if (typeof value !== "string") return undefined;
-	const outcomes: StepOutcome[] = [];
-	for (const token of value.split(/[,\s]+/)) {
-		const outcome = normalizeOutcome(token);
-		if (outcome && !outcomes.includes(outcome)) outcomes.push(outcome);
-	}
-	return outcomes.length > 0 ? outcomes : undefined;
 }
 
 /**
@@ -81,7 +64,6 @@ export function parseBlock(
 		instructions,
 		source: options.source,
 		path: options.path,
-		...(asOutcomeList(frontmatter.from) ? { from: asOutcomeList(frontmatter.from) } : {}),
 	};
 }
 
@@ -161,12 +143,7 @@ export function resolveSteps(ids: string[], blocks: Block[]): { steps: Step[]; m
 			missing.push(id);
 			continue;
 		}
-		steps.push({
-			blockId: block.id,
-			name: block.name,
-			instructions: block.instructions,
-			...(block.from ? { from: [...block.from] } : {}),
-		});
+		steps.push({ blockId: block.id, name: block.name, instructions: block.instructions });
 	}
 	return { steps, missing };
 }

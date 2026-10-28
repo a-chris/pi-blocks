@@ -4,7 +4,6 @@ name: Research
 description: Gather the facts - code, docs, history, constraints
 category: think
 order: 10
-from: done, nothing, failed
 ---
 
 You are in the RESEARCH phase. Make no changes to any file.

@@ -425,7 +425,7 @@ export default function piBlocks(pi: ExtensionAPI, options: PiBlocksOptions = {}
 				mkdirSync(dir, { recursive: true });
 				writeFileSync(
 					path,
-					`---\nid: ${id}\nname: ${id}\ndescription: One line shown in the composer\ncategory: custom\n# from: done, failed   # outcomes of the previous step this one can start from\n---\n\nDescribe the work for this step.\n\nEnd with a "## Handoff" section, then an \`Outcome:\` line.\n`,
+					`---\nid: ${id}\nname: ${id}\ndescription: One line shown in the composer\ncategory: custom\n---\n\nDescribe the work for this step.\n\nEnd with a "## Handoff" section, then an \`Outcome:\` line (done, nothing, failed, blocked, skipped).\n`,
 					"utf-8",
 				);
 				ctx.ui.notify(`Created ${path}`, "info");

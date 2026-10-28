@@ -109,7 +109,6 @@ name: Plan
 description: Turn the request into ordered, verifiable steps
 category: think
 order: 20
-from: done, failed
 ---
 
 You are in the PLANNING phase. Make no changes to any file.
@@ -125,7 +124,6 @@ You are in the PLANNING phase. Make no changes to any file.
 | `description` | no | One line shown in the composer |
 | `category` | no | Grouping label; `/wb blocks` lists by category |
 | `order` | no | Sort weight; lower comes first (default `100`) |
-| `from` | no | Outcomes of the previous step this one can start from (`done`, `nothing`, `failed`, `blocked`). Default `done` |
 
 The body is the instruction the agent receives. Blocks are read from three places, later ones overriding earlier ones by `id`:
 
@@ -155,56 +153,48 @@ Stop at any point with `esc`: the run is marked aborted and never advances.
 
 ## Stopping when a step runs out of work
 
-A chain that always runs to the end wastes the rest of the workflow on a step that
-produced nothing: an implementation that changed no files, a hunt that never found the
-cause, a review that found the change sound. So every step reports how it ended, and the
-boundary between two steps is a gate.
+A chain that always runs to the end wastes the rest of the workflow on a phase that has
+nothing to do: testing a change nobody made, reviewing an empty diff, opening a PR for an
+empty branch. So every step reports what it produced, and the step that is about to start
+decides for itself whether it has work — **the agent decides at the boundary, not a table
+of rules**. A block you write tomorrow needs no declarations for the gate to understand
+it: its own instructions say what it needs, and the handoff says whether it got it.
 
-Each step ends its final message with a `## Handoff` section (as before) and then an
-outcome line:
+Each step ends with its `## Handoff` section and then an outcome line:
 
 ```
 Outcome: done       the work is done and produced its result — a change, a plan, a
                     diagnosis, a verdict, passing checks
-Outcome: nothing    the work is done and there was nothing to do or nothing to find
+Outcome: nothing    the work was done and what you were looking for was not there
 Outcome: failed     the work is done and the result is negative — checks fail, the
                     change is not ready
 Outcome: blocked    the step could not do its work at all
+Outcome: skipped    this phase had nothing to act on, so it did not run
 ```
 
-The next step decides what it can start from, with `from:` in its frontmatter. The gate
-is evaluated per boundary, so the same outcome continues one workflow and stops another:
+Four of those are **facts about the step's own work**. `skipped` is the **decision** to
+decline the phase, and it is the only outcome that ends the run. Facts never stop a
+workflow on their own, because the same fact means different things to different phases:
 
-| Boundary | Outcome | What happens |
-|---|---|---|
-| `implement` → `test` | `nothing` | Stops: nothing changed, so there is nothing to test |
-| `implement` → `commit` | `nothing` | Stops: nothing to commit |
-| `review` → `implement` | `failed` | Continues: must-fix findings are exactly what implement is for |
-| `test` → `debug` | `failed` | Continues: a failing check is what debug is for |
-| `test` → `pr` | `failed` | Stops: a green check is what `pr` needs |
-| `hunt` → `debug` | `nothing` | Stops: without a located cause, debug has nothing to fix |
-| `research` → `plan` | `blocked` | Stops: the facts could not be established |
+- `implement` reports `nothing` → `test` starts, sees an unchanged tree, and skips. `review`
+  in the same position does the same.
+- `test` reports `failed` → `debug` reads that as a reason to work, `commit` reads the same
+  line as a reason to stop.
+- `hunt` reports `nothing` (cause not located) → `debug` skips.
+- `research` reports `blocked` → `plan` skips.
 
-`from: done` is the default because it is the safe one: a step with no declaration only
-runs after a step that got its work done. Widen it for phases that can follow anything —
-`branch` accepts `done, nothing, failed`, so a branch can be cut whatever happened before.
-
-The bundled blocks ship with these declarations:
-
-| Block | `from` | Block | `from` |
-|---|---|---|---|
-| `research` | `done, nothing, failed` | `test` | `done, failed` |
-| `plan` | `done, failed` | `review` | `done, failed` |
-| `hunt` | `done, failed` | `branch` | `done, nothing, failed` |
-| `implement` | `done, failed` | `commit` | `done` |
-| `debug` | `done, failed` | `pr` | `done` |
+The decision is made by the step that is about to run, in the same turn it would have
+worked in, so a skip costs no extra model request: the prompt asks it to check the
+handoffs first, and answer with `Outcome: skipped — <what was missing>` instead of doing
+busywork. Wording pushes the other way too, because skipping is the easy answer: a thin
+handoff is not a reason to skip, and when in doubt the step does the work.
 
 A stopped run ends like a finished one — the contract and context filtering are cleared,
 the status line goes away, the transcript keeps everything — but it is recorded as
-`stopped` and the notice says which step ran out of work and which step refused it:
+`stopped` along with what was missing:
 
 ```
-⛓ implement → test · stopped: implement reported nothing; test only runs after done or failed
+⛓ implement → test · stopped: test skipped: implement left no diff to check
 ```
 
 ## The task is required
@@ -221,11 +211,10 @@ survives the per-step context filter — that is the only channel a task has.
 
 ## Limits worth knowing
 
-- **The gate is only as honest as the outcome line.** A step that omits it is treated as
-  `done`, so a forgetful model weakens the gate instead of stopping the run. The line is
-  requested in the step prompt and repeated in the durable contract.
-- **`from:` is per block, not per position.** One block used twice in a chain declares the
-  same gate both times; a step that should only run after a failure needs its own block.
+- **The gate is a judgement, not a proof.** A step that omits the outcome line is treated
+  as `done`, and a step that skips too eagerly stops a run that should have continued. The
+  prompt asks for the line and argues against skipping; nothing can make a model's
+  judgement certain.
 - **No per-block tool or model restrictions.** A block is instructions; it cannot stop the agent from using `write` during a "research" step. Phase boundaries are enforced by wording and by the step contract.
 - **Print mode cannot start a workflow.** `pi -p "/wb run x"` is refused: a command cannot open a follow-up turn there. Interactive and RPC sessions are fine.
 - **Composer requires the TUI.** `/wb run`, `/wb list`, `/wb blocks` and the other subcommands work without it; only composition needs the terminal UI.

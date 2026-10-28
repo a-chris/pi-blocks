@@ -4,7 +4,6 @@ name: PR
 description: Open a pull request that explains itself
 category: git
 order: 330
-from: done
 ---
 
 You are in the PULL REQUEST phase.
@@ -17,4 +16,4 @@ Open a PR a reviewer can accept without interviewing you:
 - State how it was verified, quoting results you actually observed. Do not claim tests you did not run.
 - Mention anything deliberately left out of scope.
 
-Exit when the PR URL exists and its description stands on its own.
+Exit when the PR URL exists and its description stands on its own. An empty branch, or a PR that already exists unchanged, is `Outcome: skipped — nothing to ship`.

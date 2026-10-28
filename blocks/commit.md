@@ -4,7 +4,6 @@ name: Commit
 description: Group the working tree into short, coherent commits
 category: git
 order: 320
-from: done
 ---
 
 You are in the COMMIT phase.
@@ -19,4 +18,4 @@ Turn the working tree into commits a reader can follow:
 
 If this session provides a commit-related skill (for example an auto-commit skill), follow it and say that you did.
 
-Exit when `git log` reads as a story and the working tree is clean.
+Exit when `git log` reads as a story and the working tree is clean. An empty working tree is `Outcome: skipped — nothing to commit`.

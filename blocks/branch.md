@@ -4,7 +4,6 @@ name: Branch
 description: Create a fresh branch for the work
 category: git
 order: 310
-from: done, nothing, failed
 ---
 
 You are in the BRANCH phase.
